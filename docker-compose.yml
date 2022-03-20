@@ -1,0 +1,66 @@
+version: '3.7'
+
+x-hosts:
+  &default-hosts
+  - "mariadb.hass:172.16.166.11"
+
+services:
+    mariadb:
+      image: mariadb:10.7.3
+      #    build: images/mariadb
+      container_name: mariadb
+      hostname: mariadb.hass
+      environment:
+        MARIADB_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
+        MYSQL_DATABASE: "${HASS_DB_NAME}"
+        MYSQL_USER: "${HASS_DB_USER}"
+        MYSQL_PASSWORD: "${HASS_DB_PASSWORD}"
+      ports:
+        - '3306:3306'
+      volumes:
+        - hass-mariadb:/var/lib/mysql
+  #      - ${PWD}/mariadb:/var/lib/mysql
+      networks:
+        hass:
+          ipv4_address: 172.16.166.11
+
+    homeassistant:
+      container_name: home-assistant
+#      image: homeassistant/home-assistant:2022.3
+      image: linuxserver/homeassistant:2022.3.5
+      hostname: hass.hass
+      volumes:
+        # Local path where your home assistant config will be stored
+        - /etc/localtime:/etc/localtime:ro
+        # Local path where your home assistant config will be stored
+        - ./config:/config
+        - /var/run/docker.sock:/var/run/docker.sock
+        - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
+
+      environment:
+        - HASS_DB_CONNECTION=mysql://${HASS_DB_USER}:${HASS_DB_PASSWORD}@${HASS_DB_HOST}/${HASS_DB_NAME}
+        - PUID=${LOCAL_USER}
+        - PGID=${LOCAL_GROUP}
+        - TZ=Europe/Dublin
+      depends_on:
+        - mariadb
+      ports:
+        - '8123:8123'
+      networks:
+        hass:
+          ipv4_address: 172.16.166.100
+      extra_hosts: *default-hosts
+      links:
+        - "mariadb:hass_db"
+
+
+networks:
+  hass:
+    name: hass_network
+    ipam:
+      config:
+        - subnet: 172.16.166.0/24
+
+volumes:
+  hass-mariadb:
+
